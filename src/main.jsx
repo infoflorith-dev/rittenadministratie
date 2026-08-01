@@ -197,6 +197,14 @@ function App() {
   const [, setTicker] = useState(0);
   const backupInputRef = useRef(null);
 
+  function updateData(updater) {
+    setData((current) => {
+      const next = typeof updater === 'function' ? updater(current) : updater;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
   }, [data]);
@@ -288,7 +296,7 @@ function App() {
   }, [data.rides, data.activeRide, latestRide, lastMileage]);
 
   function updateVehicle(field, value) {
-    setData((current) => ({ ...current, vehicle: { ...current.vehicle, [field]: value } }));
+    updateData((current) => ({ ...current, vehicle: { ...current.vehicle, [field]: value } }));
   }
 
   async function installApp() {
@@ -385,7 +393,7 @@ function App() {
         distance,
       });
     }
-    setData((current) => ({ ...current, routeTemplates: [...(current.routeTemplates || []), ...routesToAdd] }));
+    updateData((current) => ({ ...current, routeTemplates: [...(current.routeTemplates || []), ...routesToAdd] }));
     setRouteDraft({ name: '', from: '', to: '', distance: '', addReturn: true });
     setMessage('Veelvoorkomende rit opgeslagen.');
   }
@@ -394,7 +402,7 @@ function App() {
     const route = data.routeTemplates.find((item) => item.id === routeId);
     const ok = window.confirm(`Veelvoorkomende rit "${routeLabel(route)}" verwijderen? Bestaande ritten blijven staan.`);
     if (!ok) return;
-    setData((current) => ({ ...current, routeTemplates: current.routeTemplates.filter((item) => item.id !== routeId) }));
+    updateData((current) => ({ ...current, routeTemplates: current.routeTemplates.filter((item) => item.id !== routeId) }));
     setMessage('Veelvoorkomende rit verwijderd.');
   }
 
@@ -460,7 +468,7 @@ function App() {
       setMessage(`Ritnummer ${draft.number} bestaat al. Kies een ander ritnummer.`);
       return;
     }
-    setData((current) => ({
+    updateData((current) => ({
       ...current,
       activeRide: {
         id: crypto.randomUUID(),
@@ -498,8 +506,6 @@ function App() {
       setMessage('De eindstand mag niet lager zijn dan de beginstand.');
       return;
     }
-    const ok = window.confirm('Deze rit definitief opslaan? Controleer aankomstplaats en eindstand nog één keer.');
-    if (!ok) return;
     const now = new Date();
     const completed = {
       ...data.activeRide,
@@ -509,7 +515,7 @@ function App() {
       finishedAt: now.toISOString(),
       kilometers: endMileage - Number(data.activeRide.startMileage),
     };
-    setData((current) => ({ ...current, activeRide: null, rides: [...current.rides, completed] }));
+    updateData((current) => ({ ...current, activeRide: null, rides: [...current.rides, completed] }));
     setFinishDraft({ arrivalPlace: '', endMileage: '' });
     setMessage('Rit opgeslagen.');
   }
@@ -543,7 +549,7 @@ function App() {
       return;
     }
     ride.kilometers = ride.endMileage - ride.startMileage;
-    setData((current) => ({ ...current, rides: [...current.rides, ride] }));
+    updateData((current) => ({ ...current, rides: [...current.rides, ride] }));
     setShowManualForm(false);
     setManualRide(null);
     setMessage('Handmatige rit opgeslagen.');
@@ -570,7 +576,7 @@ function App() {
       return;
     }
     ride.kilometers = ride.endMileage - ride.startMileage;
-    setData((current) => ({
+    updateData((current) => ({
       ...current,
       rides: current.rides.map((item) => (item.id === ride.id ? ride : item)),
     }));
@@ -581,7 +587,7 @@ function App() {
   function deleteRide(ride) {
     const ok = window.confirm(`Rit ${ride.number} verwijderen? Latere kilometerstanden worden niet automatisch aangepast.`);
     if (!ok) return;
-    setData((current) => ({ ...current, rides: current.rides.filter((item) => item.id !== ride.id) }));
+    updateData((current) => ({ ...current, rides: current.rides.filter((item) => item.id !== ride.id) }));
     setMessage('Rit verwijderd. Controleer of de kilometerstanden nog aansluiten.');
   }
 
@@ -680,7 +686,7 @@ function App() {
         }
         const ok = window.confirm('Back-up terugzetten? De huidige gegevens worden vervangen.');
         if (!ok) return;
-        setData({
+        updateData({
           vehicle: { ...initialVehicle, ...parsed.vehicle },
           rides: parsed.rides,
           routeTemplates: Array.isArray(parsed.routeTemplates) ? parsed.routeTemplates : [],
