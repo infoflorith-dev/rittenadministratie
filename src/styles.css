@@ -436,7 +436,7 @@ dd {
 .stat-grid {
   display: grid;
   gap: 12px;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
 .stat {
@@ -590,6 +590,18 @@ dd {
 .latest-list {
   display: grid;
   gap: 8px;
+}
+
+.manual-shortcut {
+  margin: 0 32px 18px;
+}
+
+.manual-shortcut button {
+  background: white;
+  border: 1px solid var(--line);
+  box-shadow: 0 10px 22px rgba(16, 36, 62, 0.05);
+  color: var(--navy);
+  width: 100%;
 }
 
 .latest-item {
@@ -876,13 +888,13 @@ footer {
   }
 
   .stat-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 7px;
   }
 
   .stat {
     min-height: 88px;
-    padding: 8px 5px;
+    padding: 8px 4px;
   }
 
   .stat-icon {
@@ -891,11 +903,16 @@ footer {
   }
 
   .stat span:not(.stat-icon) {
-    font-size: 10px;
+    font-size: 9px;
   }
 
   .stat strong {
-    font-size: 14px;
+    font-size: 12px;
+  }
+
+  .manual-shortcut {
+    margin: 0 16px 8px;
+    order: 7;
   }
 
   .layout {
@@ -907,23 +924,23 @@ footer {
   }
 
   .vehicle-panel {
-    order: 7;
-  }
-
-  .manual-panel {
     order: 8;
   }
 
-  .overview-panel {
+  .manual-panel {
     order: 9;
   }
 
-  .route-panel {
+  .overview-panel {
     order: 10;
   }
 
-  .latest-panel {
+  .route-panel {
     order: 11;
+  }
+
+  .latest-panel {
+    order: 8;
   }
 
   .export-panel {
@@ -1004,6 +1021,12 @@ footer {
 
   .latest-item {
     grid-template-columns: 40px 1fr auto 14px;
+  }
+
+  .latest-list {
+    max-height: 258px;
+    overflow-y: auto;
+    padding-right: 2px;
   }
 
   .desktop-table {

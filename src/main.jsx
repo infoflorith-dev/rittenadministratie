@@ -406,7 +406,7 @@ function App() {
   const ridesByNumber = useMemo(() => sortByRideNumber(data.rides), [data.rides]);
   const latestRide = ridesByNumber.at(-1);
   const highestMileageRide = useMemo(() => getHighestMileageRide(data.rides), [data.rides]);
-  const latestRides = useMemo(() => [...data.rides].sort((a, b) => b.number - a.number).slice(0, 3), [data.rides]);
+  const latestRides = useMemo(() => [...data.rides].sort((a, b) => b.number - a.number), [data.rides]);
   const nextNumber = Math.max(0, ...data.rides.map((ride) => ride.number)) + 1;
   const lastMileage = highestMileageRide ? highestMileageRide.endMileage : parseKm(data.vehicle.initialMileage);
   const connectionWarnings = useMemo(() => validateConnections(data.rides), [data.rides]);
@@ -941,7 +941,6 @@ function App() {
         <VehicleCard vehicle={data.vehicle} currentMileage={stats.currentMileage} />
       </section>
 
-      {isOfflineReady && <div className="offline-ready">Offline app klaar. Gegevens blijven lokaal in deze browser of geïnstalleerde app staan.</div>}
       {message && <div className="notice">{message}</div>}
       {connectionWarnings.length > 0 && (
         <section className="warning">
@@ -974,6 +973,18 @@ function App() {
           fillPlaceFromGps={fillPlaceFromGps}
           locationLoading={locationLoading}
         />
+      </section>
+
+      <section className="manual-shortcut app-section" data-mobile-section="home">
+        <button
+          type="button"
+          onClick={() => {
+            prepareManualRide();
+            setMobileView('more');
+          }}
+        >
+          Handmatig invullen
+        </button>
       </section>
 
       <LatestRides rides={latestRides} onEdit={setEditingRide} onViewAll={() => setMobileView('rides')} />
@@ -1456,6 +1467,7 @@ function Dashboard({ stats, period, setPeriod, periodStats }) {
   const cards = [
     ['Totaal ritten', stats.totalRides],
     ['Totaal gereden', formatKm(stats.totalKm)],
+    ['Vanaf start rijden', formatKm(stats.totalKm)],
     ['Zakelijk', formatKm(stats.businessKm)],
     ['Privé', formatKm(stats.privateKm)],
   ];
@@ -1465,13 +1477,16 @@ function Dashboard({ stats, period, setPeriod, periodStats }) {
         <h2>Overzicht</h2>
       </div>
       <div className="stat-grid">
-        {cards.map(([label, value]) => (
-          <article className={`stat ${label === 'Privé' ? 'private' : 'business'}`} key={label}>
-            <span className={`stat-icon ${label === 'Privé' ? 'private' : 'business'}`} />
+        {cards.map(([label, value]) => {
+          const isPrivate = label.startsWith('Priv');
+          return (
+          <article className={`stat ${isPrivate ? 'private' : 'business'}`} key={label}>
+            <span className={`stat-icon ${isPrivate ? 'private' : 'business'}`} />
             <span>{label}</span>
             <strong>{value}</strong>
           </article>
-        ))}
+          );
+        })}
       </div>
       <div className="period-card">
         <div className="segment-control">
