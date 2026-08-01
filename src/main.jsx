@@ -154,6 +154,17 @@ function getDurationText(startedAt) {
   return `${pad(hours)}:${pad(minutes)}:${pad(rest)}`;
 }
 
+function getGreeting(date = new Date()) {
+  const hour = date.getHours();
+  if (hour < 12) return 'Goedemorgen';
+  if (hour < 18) return 'Goedemiddag';
+  return 'Goedenavond';
+}
+
+function getFirstName(name) {
+  return (name || 'Theo').trim().split(/\s+/)[0] || 'Theo';
+}
+
 function normalizeStoredData(stored) {
   if (!stored || !stored.vehicle || !Array.isArray(stored.rides) || !('activeRide' in stored)) {
     throw new Error('Ongeldige opslag');
@@ -315,6 +326,8 @@ function App() {
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isOfflineReady, setIsOfflineReady] = useState(false);
   const [locationLoading, setLocationLoading] = useState('');
+  const [mobileView, setMobileView] = useState('home');
+  const [period, setPeriod] = useState('week');
   const [, setTicker] = useState(0);
   const backupInputRef = useRef(null);
 
@@ -393,9 +406,12 @@ function App() {
   const ridesByNumber = useMemo(() => sortByRideNumber(data.rides), [data.rides]);
   const latestRide = ridesByNumber.at(-1);
   const highestMileageRide = useMemo(() => getHighestMileageRide(data.rides), [data.rides]);
+  const latestRides = useMemo(() => [...data.rides].sort((a, b) => b.number - a.number).slice(0, 3), [data.rides]);
   const nextNumber = Math.max(0, ...data.rides.map((ride) => ride.number)) + 1;
   const lastMileage = highestMileageRide ? highestMileageRide.endMileage : parseKm(data.vehicle.initialMileage);
   const connectionWarnings = useMemo(() => validateConnections(data.rides), [data.rides]);
+  const driverFirstName = getFirstName(data.vehicle.driverName);
+  const greeting = `${getGreeting()}, ${driverFirstName}`;
 
   const filteredRides = useMemo(() => {
     const search = filters.search.toLowerCase().trim();
@@ -431,6 +447,31 @@ function App() {
       monthKm: sum(data.rides.filter((ride) => ride.date >= monthInput)),
     };
   }, [data.rides, data.activeRide, latestRide, lastMileage]);
+
+  const periodStats = useMemo(() => {
+    const today = toDateInput();
+    const now = new Date();
+    const startOfWeek = new Date(now);
+    startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
+    const weekInput = toDateInput(startOfWeek);
+    const monthInput = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
+    const inPeriod = (ride) => {
+      if (period === 'today') return ride.date === today;
+      if (period === 'month') return ride.date >= monthInput;
+      return ride.date >= weekInput;
+    };
+    const rides = data.rides.filter(inPeriod);
+    const business = rides.filter((ride) => ride.type === 'Zakelijk').reduce((total, ride) => total + Number(ride.kilometers || 0), 0);
+    const privateKm = rides.filter((ride) => ride.type !== 'Zakelijk').reduce((total, ride) => total + Number(ride.kilometers || 0), 0);
+    const total = business + privateKm;
+    return {
+      business,
+      privateKm,
+      total,
+      businessPercent: total ? Math.round((business / total) * 100) : 0,
+      privatePercent: total ? Math.round((privateKm / total) * 100) : 0,
+    };
+  }, [data.rides, period]);
 
   function updateVehicle(field, value) {
     updateData((current) => ({ ...current, vehicle: { ...current.vehicle, [field]: value } }));
@@ -884,21 +925,21 @@ function App() {
   }
 
   return (
-    <main>
-      <header className="topbar">
-        <div>
-          <h1>Rittenadministratie</h1>
-          <p>Lokale administratie voor de tijdelijke leenauto</p>
-        </div>
+    <main data-mobile-view={mobileView}>
+      <header className="topbar app-header">
+        <AppLogo />
         <div className="top-actions">
-          {installPrompt && <button onClick={installApp}>App installeren</button>}
-          <button onClick={saveBackup}>Back-up opslaan</button>
-          <button onClick={downloadLatestAutoBackup}>Laatste auto-back-up downloaden</button>
-          <button onClick={restoreLatestAutoBackup}>Laatste auto-back-up terugzetten</button>
-          <button onClick={() => backupInputRef.current.click()}>Back-up terugzetten</button>
+          {installPrompt && <button className="icon-button install-button" onClick={installApp} title="App installeren">Installeren</button>}
+          <button className="icon-button" onClick={() => setMobileView('export')} title="Export en back-up">Export</button>
+          <button className="icon-button" onClick={() => setMobileView('more')} title="Instellingen">Instellingen</button>
           <input ref={backupInputRef} type="file" accept="application/json" hidden onChange={(event) => restoreBackup(event.target.files[0])} />
         </div>
       </header>
+
+      <section className="hero-panel" data-mobile-section="home">
+        <h1>{greeting}</h1>
+        <VehicleCard vehicle={data.vehicle} currentMileage={stats.currentMileage} />
+      </section>
 
       {isOfflineReady && <div className="offline-ready">Offline app klaar. Gegevens blijven lokaal in deze browser of geïnstalleerde app staan.</div>}
       {message && <div className="notice">{message}</div>}
@@ -911,7 +952,9 @@ function App() {
         </section>
       )}
 
-      <section className="layout">
+      <Dashboard stats={stats} period={period} setPeriod={setPeriod} periodStats={periodStats} />
+
+      <section className="layout app-section" data-mobile-section="home">
         <VehicleSettings vehicle={data.vehicle} updateVehicle={updateVehicle} />
         <RideControl
           activeRide={data.activeRide}
@@ -932,6 +975,8 @@ function App() {
           locationLoading={locationLoading}
         />
       </section>
+
+      <LatestRides rides={latestRides} onEdit={setEditingRide} onViewAll={() => setMobileView('rides')} />
 
       <RouteTemplates
         routes={data.routeTemplates}
@@ -957,9 +1002,16 @@ function App() {
         }}
       />
 
-      <Dashboard stats={stats} />
+      <ExportPanel
+        saveBackup={saveBackup}
+        restoreBackup={() => backupInputRef.current.click()}
+        exportPdf={exportPdf}
+        exportExcel={exportExcel}
+        downloadLatestAutoBackup={downloadLatestAutoBackup}
+        restoreLatestAutoBackup={restoreLatestAutoBackup}
+      />
 
-      <section className="panel overview-panel">
+      <section className="panel overview-panel app-section" data-mobile-section="rides">
         <div className="section-heading">
           <div>
             <h2>Rittenoverzicht</h2>
@@ -978,6 +1030,8 @@ function App() {
         <EditRideModal ride={editingRide} setRide={setEditingRide} onSave={saveEditedRide} onClose={() => setEditingRide(null)} />
       )}
 
+      <MobileNav activeView={mobileView} setActiveView={setMobileView} />
+
       <footer>
         Alles wordt alleen in deze browser opgeslagen. Wanneer browsergegevens worden gewist, kunnen ritten verdwijnen. Maak daarom regelmatig een back-up of export.
       </footer>
@@ -985,9 +1039,113 @@ function App() {
   );
 }
 
+function AppLogo() {
+  return (
+    <div className="app-logo" aria-label="THEO Rittenadministratie">
+      <div className="logo-mark">
+        <span className="logo-road" />
+        <span className="logo-pin" />
+      </div>
+      <div>
+        <strong>THEO</strong>
+        <span>Rittenadministratie</span>
+      </div>
+    </div>
+  );
+}
+
+function VehicleCard({ vehicle, currentMileage }) {
+  return (
+    <article className="vehicle-card">
+      <div>
+        <h2>{vehicle.vehicleName || 'Voertuig'}</h2>
+        <span className="license-chip">{vehicle.licensePlate || '-'}</span>
+        <strong>{formatKm(currentMileage)}</strong>
+        <p>Laatste stand</p>
+      </div>
+      <div className="road-orb" aria-hidden="true">
+        <span />
+      </div>
+    </article>
+  );
+}
+
+function LatestRides({ rides, onEdit, onViewAll }) {
+  return (
+    <section className="panel latest-panel app-section" data-mobile-section="home">
+      <div className="section-heading compact-heading">
+        <h2>Laatste ritten</h2>
+        <button className="text-button" type="button" onClick={onViewAll}>Bekijk alles</button>
+      </div>
+      <div className="latest-list">
+        {rides.length === 0 && <p className="muted">Nog geen ritten opgeslagen.</p>}
+        {rides.map((ride) => (
+          <button className="latest-item" type="button" key={ride.id} onClick={() => onEdit({ ...ride })}>
+            <span className={`ride-type-icon ${ride.type === 'Prive' ? 'private' : 'business'}`} />
+            <span>
+              <strong>{ride.departurePlace} → {ride.arrivalPlace}</strong>
+              <small>{formatDate(ride.date)}</small>
+            </span>
+            <span className="latest-km">
+              <strong>{formatKm(ride.kilometers)}</strong>
+              <small className={ride.type === 'Prive' ? 'private-text' : 'business-text'}>{ride.type === 'Prive' ? 'Privé' : 'Zakelijk'}</small>
+            </span>
+            <span className="chevron">›</span>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ExportPanel({ saveBackup, restoreBackup, exportPdf, exportExcel, downloadLatestAutoBackup, restoreLatestAutoBackup }) {
+  return (
+    <section className="panel export-panel app-section" data-mobile-section="export">
+      <div className="section-heading">
+        <div>
+          <h2>Export en back-up</h2>
+          <p>Bewaar of herstel je rittenadministratie.</p>
+        </div>
+      </div>
+      <div className="export-grid">
+        <button onClick={exportPdf}>PDF exporteren</button>
+        <button onClick={exportExcel}>Excel exporteren</button>
+        <button onClick={saveBackup}>Back-up opslaan</button>
+        <button onClick={restoreBackup}>Back-up terugzetten</button>
+        <button onClick={downloadLatestAutoBackup}>Laatste auto-back-up downloaden</button>
+        <button onClick={restoreLatestAutoBackup}>Laatste auto-back-up terugzetten</button>
+      </div>
+    </section>
+  );
+}
+
+function MobileNav({ activeView, setActiveView }) {
+  const items = [
+    ['home', 'Home'],
+    ['rides', 'Ritten'],
+    ['export', 'Export'],
+    ['more', 'Meer'],
+  ];
+  return (
+    <nav className="mobile-nav" aria-label="Mobiele navigatie">
+      {items.map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          className={activeView === value ? 'active' : ''}
+          onClick={() => setActiveView(value)}
+        >
+          <span className={`nav-icon ${value}`} />
+          {label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
 function VehicleSettings({ vehicle, updateVehicle }) {
   return (
-    <section className="panel vehicle-panel">
+    <section className="panel vehicle-panel" data-mobile-section="more">
       <h2>Voertuiggegevens</h2>
       <div className="form-grid">
         <label>
@@ -1036,7 +1194,7 @@ function RideControl(props) {
   } = props;
 
   return (
-    <section className="panel ride-panel">
+    <section className="panel ride-panel" data-mobile-section="home">
       <h2>Rit</h2>
       {!activeRide && !showStartForm && (
         <button className="primary-start" onClick={prepareStartRide}>
@@ -1156,7 +1314,7 @@ function RideControl(props) {
 
 function RouteTemplates({ routes, routeDraft, setRouteDraft, saveRouteTemplate, deleteRouteTemplate, routeLabel }) {
   return (
-    <section className="panel route-panel">
+    <section className="panel route-panel" data-mobile-section="more">
       <div className="section-heading">
         <div>
           <h2>Veelvoorkomende ritten</h2>
@@ -1212,7 +1370,7 @@ function ManualRideEntry({
   cancelManualRide,
 }) {
   return (
-    <section className="panel manual-panel">
+    <section className="panel manual-panel" data-mobile-section="more">
       <div className="section-heading">
         <div>
           <h2>Papieren rit handmatig invoeren</h2>
@@ -1294,26 +1452,43 @@ function ManualRideEntry({
   );
 }
 
-function Dashboard({ stats }) {
+function Dashboard({ stats, period, setPeriod, periodStats }) {
   const cards = [
     ['Totaal ritten', stats.totalRides],
     ['Totaal gereden', formatKm(stats.totalKm)],
     ['Zakelijk', formatKm(stats.businessKm)],
     ['Privé', formatKm(stats.privateKm)],
-    ['Laatst bekende stand', formatKm(stats.currentMileage)],
-    ['Laatste rit', stats.lastRide],
-    ['Vandaag', formatKm(stats.todayKm)],
-    ['Deze week', formatKm(stats.weekKm)],
-    ['Deze maand', formatKm(stats.monthKm)],
   ];
   return (
-    <section className="dashboard">
-      {cards.map(([label, value]) => (
-        <article className="stat" key={label}>
-          <span>{label}</span>
-          <strong>{value}</strong>
-        </article>
-      ))}
+    <section className="dashboard app-section" data-mobile-section="home">
+      <div className="section-heading compact-heading dashboard-heading">
+        <h2>Overzicht</h2>
+      </div>
+      <div className="stat-grid">
+        {cards.map(([label, value]) => (
+          <article className={`stat ${label === 'Privé' ? 'private' : 'business'}`} key={label}>
+            <span className={`stat-icon ${label === 'Privé' ? 'private' : 'business'}`} />
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="period-card">
+        <div className="segment-control">
+          <button className={period === 'today' ? 'active' : ''} type="button" onClick={() => setPeriod('today')}>Vandaag</button>
+          <button className={period === 'week' ? 'active' : ''} type="button" onClick={() => setPeriod('week')}>Week</button>
+          <button className={period === 'month' ? 'active' : ''} type="button" onClick={() => setPeriod('month')}>Maand</button>
+        </div>
+        <div className="split-row">
+          <span>Zakelijk<br /><strong>{formatKm(periodStats.business)}</strong></span>
+          <strong>{periodStats.total ? `${periodStats.businessPercent}%` : '0%'}</strong>
+          <span>Privé<br /><strong>{formatKm(periodStats.privateKm)}</strong></span>
+        </div>
+        <div className="split-bar" aria-label="Kilometerverdeling">
+          <span style={{ width: `${periodStats.businessPercent}%` }} />
+          <i style={{ width: `${periodStats.privatePercent}%` }} />
+        </div>
+      </div>
     </section>
   );
 }
