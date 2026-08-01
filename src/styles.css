@@ -317,6 +317,10 @@ main > .panel {
   overflow: auto;
 }
 
+.mobile-ride-list {
+  display: none;
+}
+
 table {
   border-collapse: collapse;
   min-width: 1420px;
@@ -572,65 +576,79 @@ footer {
     grid-template-columns: 1fr;
   }
 
-  .table-wrap {
-    border: 0;
-    overflow: visible;
-  }
-
-  table,
-  tbody,
-  tr,
-  td {
-    display: block;
-    min-width: 0;
-    width: 100%;
-  }
-
-  thead {
+  .desktop-table {
     display: none;
   }
 
-  tbody tr {
+  .mobile-ride-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-ride-card {
     background: white;
     border: 1px solid #dbe4ec;
     border-radius: 8px;
     box-shadow: 0 8px 18px rgba(20, 40, 70, 0.05);
-    margin-bottom: 12px;
     overflow: hidden;
   }
 
-  tbody tr:nth-child(even) {
+  .mobile-ride-summary {
+    align-items: center;
     background: white;
-  }
-
-  td {
-    align-items: start;
-    border-top: 1px solid #e6edf3;
     display: grid;
-    font-size: 14px;
-    gap: 10px;
-    grid-template-columns: 110px 1fr;
-    padding: 11px 12px;
+    grid-template-columns: 1fr auto;
+    min-height: 58px;
+    padding: 0 14px;
     text-align: left;
+    width: 100%;
   }
 
-  td:first-child {
-    border-top: 0;
-  }
-
-  td::before {
-    color: #657387;
-    content: attr(data-label);
+  .mobile-ride-summary span {
+    color: #10263f;
+    font-size: 17px;
     font-weight: 800;
   }
 
-  .number {
-    text-align: left;
+  .mobile-ride-summary strong {
+    color: #46556a;
+    font-size: 15px;
   }
 
-  .row-actions {
+  .mobile-ride-details {
+    display: grid;
+    gap: 0;
+    border-top: 1px solid #e6edf3;
+  }
+
+  .mobile-ride-details > div {
+    align-items: start;
+    border-top: 1px solid #e6edf3;
+    display: grid;
+    gap: 10px;
+    grid-template-columns: 104px 1fr;
+    padding: 10px 12px;
+  }
+
+  .mobile-ride-details > div:first-child {
+    border-top: 0;
+  }
+
+  .mobile-ride-details span {
+    color: #657387;
+    font-weight: 800;
+  }
+
+  .mobile-ride-details strong {
+    color: #172033;
+    font-weight: 700;
+    overflow-wrap: anywhere;
+  }
+
+  .mobile-ride-details .mobile-ride-actions {
     display: grid;
     grid-template-columns: 1fr;
+    gap: 8px;
     min-width: 0;
   }
 

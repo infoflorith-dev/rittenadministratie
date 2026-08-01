@@ -1154,8 +1154,11 @@ function Filters({ filters, setFilters }) {
 }
 
 function RideTable({ rides, onEdit, onDelete }) {
+  const [openRideId, setOpenRideId] = useState('');
+
   return (
-    <div className="table-wrap">
+    <>
+    <div className="table-wrap desktop-table">
       <table>
         <thead>
           <tr>
@@ -1203,6 +1206,44 @@ function RideTable({ rides, onEdit, onDelete }) {
         </tbody>
       </table>
     </div>
+    <div className="mobile-ride-list">
+      {rides.length === 0 && <p className="empty">Nog geen ritten gevonden.</p>}
+      {rides.map((ride) => {
+        const isOpen = openRideId === ride.id;
+        return (
+          <article className="mobile-ride-card" key={ride.id}>
+            <button
+              className="mobile-ride-summary"
+              type="button"
+              aria-expanded={isOpen}
+              onClick={() => setOpenRideId(isOpen ? '' : ride.id)}
+            >
+              <span>Rit {ride.number}</span>
+              <strong>{formatDate(ride.date)}</strong>
+            </button>
+            {isOpen && (
+              <div className="mobile-ride-details">
+                <div><span>Bestuurder</span><strong>{ride.driverName}</strong></div>
+                <div><span>Van</span><strong>{ride.departurePlace}</strong></div>
+                <div><span>Naar</span><strong>{ride.arrivalPlace}</strong></div>
+                <div><span>Vertrek</span><strong>{ride.departureTime || '-'}</strong></div>
+                <div><span>Aankomst</span><strong>{ride.arrivalTime || '-'}</strong></div>
+                <div><span>Beginstand</span><strong>{formatKm(ride.startMileage)}</strong></div>
+                <div><span>Eindstand</span><strong>{formatKm(ride.endMileage)}</strong></div>
+                <div><span>Kilometers</span><strong>{formatKm(ride.kilometers)}</strong></div>
+                <div><span>Type</span><strong>{ride.type === 'Prive' ? 'Privé' : ride.type}</strong></div>
+                <div><span>Doel</span><strong>{ride.purpose || '-'}</strong></div>
+                <div className="mobile-ride-actions">
+                  <button onClick={() => onEdit({ ...ride })}>Bekijken/bewerken</button>
+                  <button className="danger" onClick={() => onDelete(ride)}>Verwijderen</button>
+                </div>
+              </div>
+            )}
+          </article>
+        );
+      })}
+    </div>
+    </>
   );
 }
 
