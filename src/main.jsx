@@ -456,6 +456,7 @@ function App() {
     const weekInput = toDateInput(startOfWeek);
     const monthInput = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-01`;
     const inPeriod = (ride) => {
+      if (period === 'total') return true;
       if (period === 'today') return ride.date === today;
       if (period === 'month') return ride.date >= monthInput;
       return ride.date >= weekInput;
@@ -1467,7 +1468,6 @@ function Dashboard({ stats, period, setPeriod, periodStats }) {
   const cards = [
     ['Totaal ritten', stats.totalRides],
     ['Totaal gereden', formatKm(stats.totalKm)],
-    ['Vanaf start rijden', formatKm(stats.totalKm)],
     ['Zakelijk', formatKm(stats.businessKm)],
     ['Privé', formatKm(stats.privateKm)],
   ];
@@ -1493,6 +1493,7 @@ function Dashboard({ stats, period, setPeriod, periodStats }) {
           <button className={period === 'today' ? 'active' : ''} type="button" onClick={() => setPeriod('today')}>Vandaag</button>
           <button className={period === 'week' ? 'active' : ''} type="button" onClick={() => setPeriod('week')}>Week</button>
           <button className={period === 'month' ? 'active' : ''} type="button" onClick={() => setPeriod('month')}>Maand</button>
+          <button className={period === 'total' ? 'active' : ''} type="button" onClick={() => setPeriod('total')}>Totaal</button>
         </div>
         <div className="split-row">
           <span>Zakelijk<br /><strong>{formatKm(periodStats.business)}</strong></span>
