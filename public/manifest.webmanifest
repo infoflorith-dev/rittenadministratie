@@ -1,0 +1,19 @@
+{
+  "name": "Rittenadministratie",
+  "short_name": "Ritten",
+  "description": "Lokale rittenadministratie voor de Volvo EX30.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f4f6f8",
+  "theme_color": "#0e2b4a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
