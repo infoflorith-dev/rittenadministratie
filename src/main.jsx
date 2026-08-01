@@ -69,6 +69,58 @@ function downloadFile(filename, content, type) {
   URL.revokeObjectURL(url);
 }
 
+function getPosition() {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('GPS wordt niet ondersteund op dit apparaat.'));
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      maximumAge: 30000,
+      timeout: 15000,
+    });
+  });
+}
+
+async function getPlaceFromPosition(position) {
+  const { latitude, longitude } = position.coords;
+  const fallback = `${latitude.toFixed(5)}, ${longitude.toFixed(5)}`;
+
+  try {
+    const params = new URLSearchParams({
+      format: 'jsonv2',
+      lat: String(latitude),
+      lon: String(longitude),
+      zoom: '12',
+      addressdetails: '1',
+    });
+    const response = await fetch(`https://nominatim.openstreetmap.org/reverse?${params}`);
+    if (!response.ok) return fallback;
+    const result = await response.json();
+    const address = result.address || {};
+    return (
+      address.city ||
+      address.town ||
+      address.village ||
+      address.municipality ||
+      address.suburb ||
+      address.hamlet ||
+      result.name ||
+      fallback
+    );
+  } catch {
+    return fallback;
+  }
+}
+
+function getLocationErrorMessage(error) {
+  if (error?.code === 1) return 'Locatie is geweigerd. Zet locatietoegang aan voor deze app/browser.';
+  if (error?.code === 2) return 'Locatie kon niet worden bepaald. Probeer het buiten of met GPS aan.';
+  if (error?.code === 3) return 'Locatie bepalen duurde te lang. Probeer het nog een keer.';
+  return error?.message || 'Locatie kon niet worden bepaald.';
+}
+
 function sortChronological(rides) {
   return [...rides].sort((a, b) => {
     const dateCompare = `${a.date} ${a.departureTime}`.localeCompare(`${b.date} ${b.departureTime}`);
@@ -141,6 +193,7 @@ function App() {
   const [message, setMessage] = useState('');
   const [installPrompt, setInstallPrompt] = useState(null);
   const [isOfflineReady, setIsOfflineReady] = useState(false);
+  const [locationLoading, setLocationLoading] = useState('');
   const [, setTicker] = useState(0);
   const backupInputRef = useRef(null);
 
@@ -250,6 +303,26 @@ function App() {
 
   function routeLabel(route) {
     return `${route.name || `${route.from} - ${route.to}`} (${formatKm(route.distance)})`;
+  }
+
+  async function fillPlaceFromGps(target, setter) {
+    if (!window.isSecureContext) {
+      setMessage('GPS werkt alleen via de veilige Vercel-link of op localhost.');
+      return;
+    }
+    setLocationLoading(target);
+    setMessage('Locatie bepalen...');
+    try {
+      const position = await getPosition();
+      const place = await getPlaceFromPosition(position);
+      setter(place);
+      const accuracy = position.coords.accuracy ? ` Nauwkeurigheid ongeveer ${Math.round(position.coords.accuracy)} meter.` : '';
+      setMessage(`Locatie ingevuld: ${place}.${accuracy}`);
+    } catch (error) {
+      setMessage(getLocationErrorMessage(error));
+    } finally {
+      setLocationLoading('');
+    }
   }
 
   function applyRouteToDraft(routeId) {
@@ -665,6 +738,8 @@ function App() {
           routeTemplates={data.routeTemplates}
           routeLabel={routeLabel}
           applyRouteToDraft={applyRouteToDraft}
+          fillPlaceFromGps={fillPlaceFromGps}
+          locationLoading={locationLoading}
         />
       </section>
 
@@ -765,6 +840,8 @@ function RideControl(props) {
     routeTemplates,
     routeLabel,
     applyRouteToDraft,
+    fillPlaceFromGps,
+    locationLoading,
   } = props;
 
   return (
@@ -809,7 +886,16 @@ function RideControl(props) {
             </label>
             <label>
               Vertrekplaats
-              <input value={draft.departurePlace} onChange={(event) => setDraft({ ...draft, departurePlace: event.target.value })} />
+              <div className="input-with-button">
+                <input value={draft.departurePlace} onChange={(event) => setDraft({ ...draft, departurePlace: event.target.value })} />
+                <button
+                  type="button"
+                  onClick={() => fillPlaceFromGps('departure', (place) => setDraft((current) => ({ ...current, departurePlace: place })))}
+                  disabled={locationLoading === 'departure'}
+                >
+                  {locationLoading === 'departure' ? 'Zoeken...' : 'Gebruik GPS'}
+                </button>
+              </div>
             </label>
             <label>
               Geplande aankomstplaats
@@ -853,7 +939,16 @@ function RideControl(props) {
           <form onSubmit={finishRide} className="finish-form">
             <label>
               Aankomstplaats
-              <input value={finishDraft.arrivalPlace} onChange={(event) => setFinishDraft({ ...finishDraft, arrivalPlace: event.target.value })} />
+              <div className="input-with-button">
+                <input value={finishDraft.arrivalPlace} onChange={(event) => setFinishDraft({ ...finishDraft, arrivalPlace: event.target.value })} />
+                <button
+                  type="button"
+                  onClick={() => fillPlaceFromGps('arrival', (place) => setFinishDraft((current) => ({ ...current, arrivalPlace: place })))}
+                  disabled={locationLoading === 'arrival'}
+                >
+                  {locationLoading === 'arrival' ? 'Zoeken...' : 'Gebruik GPS'}
+                </button>
+              </div>
             </label>
             <label>
               Actuele eindstand
