@@ -461,8 +461,58 @@ footer {
   }
 
   main {
+    display: flex;
+    flex-direction: column;
     min-width: 0;
     width: 100%;
+  }
+
+  .topbar {
+    order: 1;
+  }
+
+  .offline-ready {
+    order: 2;
+  }
+
+  .notice {
+    order: 3;
+  }
+
+  .warning {
+    order: 4;
+  }
+
+  .dashboard {
+    order: 5;
+  }
+
+  .layout {
+    display: contents;
+  }
+
+  .ride-panel {
+    order: 6;
+  }
+
+  .vehicle-panel {
+    order: 7;
+  }
+
+  .manual-panel {
+    order: 8;
+  }
+
+  .overview-panel {
+    order: 9;
+  }
+
+  .route-panel {
+    order: 10;
+  }
+
+  footer {
+    order: 11;
   }
 
   .topbar {
@@ -512,6 +562,8 @@ footer {
   }
 
   main > .panel,
+  .vehicle-panel,
+  .ride-panel,
   .notice,
   .warning,
   .offline-ready {

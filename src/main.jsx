@@ -812,7 +812,7 @@ function App() {
 
       <Dashboard stats={stats} />
 
-      <section className="panel">
+      <section className="panel overview-panel">
         <div className="section-heading">
           <div>
             <h2>Rittenoverzicht</h2>
@@ -840,7 +840,7 @@ function App() {
 
 function VehicleSettings({ vehicle, updateVehicle }) {
   return (
-    <section className="panel">
+    <section className="panel vehicle-panel">
       <h2>Voertuiggegevens</h2>
       <div className="form-grid">
         <label>
