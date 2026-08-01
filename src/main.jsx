@@ -6,6 +6,7 @@ import * as XLSX from 'xlsx';
 import './styles.css';
 
 const STORAGE_KEY = 'rittenadministratie-fase1-v1';
+const STORAGE_BACKUP_KEY = 'rittenadministratie-fase1-v1-safety-copy';
 
 const initialVehicle = {
   driverName: 'Theo Verdooren',
@@ -148,10 +149,10 @@ function getDurationText(startedAt) {
   return `${pad(hours)}:${pad(minutes)}:${pad(rest)}`;
 }
 
-function loadData() {
-  try {
-    const stored = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (!stored) throw new Error('Geen data');
+function normalizeStoredData(stored) {
+  if (!stored || !stored.vehicle || !Array.isArray(stored.rides) || !('activeRide' in stored)) {
+    throw new Error('Ongeldige opslag');
+  }
     const vehicle = { ...initialVehicle, ...stored.vehicle };
     if (!vehicle.licensePlate) vehicle.licensePlate = initialVehicle.licensePlate;
     if (!vehicle.vehicleName) vehicle.vehicleName = initialVehicle.vehicleName;
@@ -161,9 +162,30 @@ function loadData() {
       routeTemplates: Array.isArray(stored.routeTemplates) ? stored.routeTemplates : [],
       activeRide: stored.activeRide || null,
     };
-  } catch {
-    return { vehicle: initialVehicle, rides: [], routeTemplates: [], activeRide: null };
+}
+
+function saveDataToStorage(data) {
+  const serialized = JSON.stringify(data);
+  localStorage.setItem(STORAGE_KEY, serialized);
+  if ((data.rides?.length || 0) > 0 || data.activeRide) {
+    localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
   }
+}
+
+function loadData() {
+  const sources = [STORAGE_KEY, STORAGE_BACKUP_KEY];
+  for (const key of sources) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const data = normalizeStoredData(JSON.parse(raw));
+      if (key !== STORAGE_KEY) saveDataToStorage(data);
+      return data;
+    } catch {
+      // Probeer de veiligheidskopie voordat we leeg starten.
+    }
+  }
+  return { vehicle: initialVehicle, rides: [], routeTemplates: [], activeRide: null };
 }
 
 function validateConnections(rides) {
@@ -200,13 +222,13 @@ function App() {
   function updateData(updater) {
     setData((current) => {
       const next = typeof updater === 'function' ? updater(current) : updater;
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+      saveDataToStorage(next);
       return next;
     });
   }
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    saveDataToStorage(data);
   }, [data]);
 
   useEffect(() => {
@@ -495,15 +517,20 @@ function App() {
   }
 
   function finishRide(event) {
-    event.preventDefault();
-    if (!data.activeRide) return;
+    event?.preventDefault();
+    if (!data.activeRide) {
+      setMessage('Er is geen actieve rit om te beëindigen.');
+      return;
+    }
     const endMileage = parseKm(finishDraft.endMileage);
     if (!finishDraft.arrivalPlace.trim() || finishDraft.endMileage === '') {
       setMessage('Vul aankomstplaats en eindstand in.');
+      window.alert('Vul aankomstplaats en eindstand in voordat je de rit beëindigt.');
       return;
     }
     if (endMileage < Number(data.activeRide.startMileage)) {
       setMessage('De eindstand mag niet lager zijn dan de beginstand.');
+      window.alert('De eindstand mag niet lager zijn dan de beginstand.');
       return;
     }
     const now = new Date();
@@ -518,6 +545,15 @@ function App() {
     updateData((current) => ({ ...current, activeRide: null, rides: [...current.rides, completed] }));
     setFinishDraft({ arrivalPlace: '', endMileage: '' });
     setMessage('Rit opgeslagen.');
+  }
+
+  function cancelActiveRide() {
+    if (!data.activeRide) return;
+    const ok = window.confirm(`Actieve rit ${data.activeRide.number} annuleren? Deze rit wordt niet opgeslagen, je eerdere ritten blijven staan.`);
+    if (!ok) return;
+    updateData((current) => ({ ...current, activeRide: null }));
+    setFinishDraft({ arrivalPlace: '', endMileage: '' });
+    setMessage('Actieve rit geannuleerd. Je kunt weer een rit starten.');
   }
 
   function saveManualRide(event) {
@@ -741,6 +777,7 @@ function App() {
           finishDraft={finishDraft}
           setFinishDraft={setFinishDraft}
           finishRide={finishRide}
+          cancelActiveRide={cancelActiveRide}
           routeTemplates={data.routeTemplates}
           routeLabel={routeLabel}
           applyRouteToDraft={applyRouteToDraft}
@@ -843,6 +880,7 @@ function RideControl(props) {
     finishDraft,
     setFinishDraft,
     finishRide,
+    cancelActiveRide,
     routeTemplates,
     routeLabel,
     applyRouteToDraft,
@@ -942,7 +980,7 @@ function RideControl(props) {
             {activeRide.fixedDistance !== '' && <div><dt>Vaste afstand</dt><dd>{formatKm(activeRide.fixedDistance)}</dd></div>}
             <div><dt>Actief</dt><dd>{getDurationText(activeRide.startedAt)}</dd></div>
           </dl>
-          <form onSubmit={finishRide} className="finish-form">
+          <div className="finish-form">
             <label>
               Aankomstplaats
               <div className="input-with-button">
@@ -960,8 +998,9 @@ function RideControl(props) {
               Actuele eindstand
               <input inputMode="numeric" value={finishDraft.endMileage} onChange={(event) => setFinishDraft({ ...finishDraft, endMileage: event.target.value })} />
             </label>
-            <button className="primary-stop" type="submit">Rit beëindigen</button>
-          </form>
+            <button className="primary-stop" type="button" onClick={finishRide}>Rit beëindigen</button>
+            <button className="danger" type="button" onClick={cancelActiveRide}>Actieve rit annuleren</button>
+          </div>
         </div>
       )}
     </section>

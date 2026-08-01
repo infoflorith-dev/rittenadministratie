@@ -170,7 +170,7 @@ select:focus {
   align-items: end;
   display: grid;
   gap: 14px;
-  grid-template-columns: 1fr 180px 190px;
+  grid-template-columns: 1fr 180px 190px 190px;
   margin-top: 16px;
 }
 
