@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rittenadministratie-offline-v6';
+const CACHE_NAME = 'rittenadministratie-offline-v7';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

@@ -7,6 +7,9 @@ import './styles.css';
 
 const STORAGE_KEY = 'rittenadministratie-fase1-v1';
 const STORAGE_BACKUP_KEY = 'rittenadministratie-fase1-v1-safety-copy';
+const DB_NAME = 'rittenadministratie-db';
+const DB_STORE = 'rittenadministratie-store';
+const DB_DATA_KEY = 'current-data';
 
 const initialVehicle = {
   driverName: 'Theo Verdooren',
@@ -153,15 +156,75 @@ function normalizeStoredData(stored) {
   if (!stored || !stored.vehicle || !Array.isArray(stored.rides) || !('activeRide' in stored)) {
     throw new Error('Ongeldige opslag');
   }
-    const vehicle = { ...initialVehicle, ...stored.vehicle };
-    if (!vehicle.licensePlate) vehicle.licensePlate = initialVehicle.licensePlate;
-    if (!vehicle.vehicleName) vehicle.vehicleName = initialVehicle.vehicleName;
-    return {
-      vehicle,
-      rides: Array.isArray(stored.rides) ? stored.rides : [],
-      routeTemplates: Array.isArray(stored.routeTemplates) ? stored.routeTemplates : [],
-      activeRide: stored.activeRide || null,
+  const vehicle = { ...initialVehicle, ...stored.vehicle };
+  if (!vehicle.licensePlate) vehicle.licensePlate = initialVehicle.licensePlate;
+  if (!vehicle.vehicleName) vehicle.vehicleName = initialVehicle.vehicleName;
+  return {
+    vehicle,
+    rides: Array.isArray(stored.rides) ? stored.rides : [],
+    routeTemplates: Array.isArray(stored.routeTemplates) ? stored.routeTemplates : [],
+    activeRide: stored.activeRide || null,
+  };
+}
+
+function dataScore(data) {
+  return (data.rides?.length || 0) * 10 + (data.activeRide ? 5 : 0) + (data.routeTemplates?.length || 0);
+}
+
+function chooseSafestData(current, candidate) {
+  if (!candidate) return current;
+  return dataScore(candidate) > dataScore(current) ? candidate : current;
+}
+
+function openDatabase() {
+  return new Promise((resolve, reject) => {
+    if (!('indexedDB' in window)) {
+      reject(new Error('IndexedDB niet beschikbaar'));
+      return;
+    }
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore(DB_STORE);
     };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+async function saveDataToIndexedDb(data) {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(DB_STORE, 'readwrite');
+    transaction.objectStore(DB_STORE).put(data, DB_DATA_KEY);
+    transaction.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    transaction.onerror = () => {
+      db.close();
+      reject(transaction.error);
+    };
+  });
+}
+
+async function loadDataFromIndexedDb() {
+  const db = await openDatabase();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(DB_STORE, 'readonly');
+    const request = transaction.objectStore(DB_STORE).get(DB_DATA_KEY);
+    request.onsuccess = () => {
+      db.close();
+      try {
+        resolve(request.result ? normalizeStoredData(request.result) : null);
+      } catch (error) {
+        reject(error);
+      }
+    };
+    request.onerror = () => {
+      db.close();
+      reject(request.error);
+    };
+  });
 }
 
 function saveDataToStorage(data) {
@@ -169,6 +232,7 @@ function saveDataToStorage(data) {
   localStorage.setItem(STORAGE_KEY, serialized);
   if ((data.rides?.length || 0) > 0 || data.activeRide) {
     localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
+    saveDataToIndexedDb(data).catch(() => {});
   }
 }
 
@@ -228,8 +292,24 @@ function App() {
   }
 
   useEffect(() => {
-    saveDataToStorage(data);
-  }, [data]);
+    let cancelled = false;
+    loadDataFromIndexedDb()
+      .then((storedData) => {
+        if (cancelled || !storedData) return;
+        setData((current) => {
+          const safest = chooseSafestData(current, storedData);
+          if (safest !== current) {
+            saveDataToStorage(safest);
+            setMessage('Gegevens hersteld uit veilige telefoonopslag.');
+          }
+          return safest;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => setTicker((value) => value + 1), 1000);
