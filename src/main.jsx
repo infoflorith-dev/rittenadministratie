@@ -7,6 +7,8 @@ import './styles.css';
 
 const STORAGE_KEY = 'rittenadministratie-fase1-v1';
 const STORAGE_BACKUP_KEY = 'rittenadministratie-fase1-v1-safety-copy';
+const AUTO_BACKUPS_KEY = 'rittenadministratie-auto-backups-v1';
+const MAX_AUTO_BACKUPS = 10;
 const DB_NAME = 'rittenadministratie-db';
 const DB_STORE = 'rittenadministratie-store';
 const DB_DATA_KEY = 'current-data';
@@ -234,6 +236,39 @@ function saveDataToStorage(data) {
     localStorage.setItem(STORAGE_BACKUP_KEY, serialized);
     saveDataToIndexedDb(data).catch(() => {});
   }
+}
+
+function getAutoBackups() {
+  try {
+    const backups = JSON.parse(localStorage.getItem(AUTO_BACKUPS_KEY));
+    return Array.isArray(backups) ? backups : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAutoBackups(backups) {
+  localStorage.setItem(AUTO_BACKUPS_KEY, JSON.stringify(backups.slice(0, MAX_AUTO_BACKUPS)));
+}
+
+function makeBackupName(rideNumber, date = new Date()) {
+  return `rittenadministratie-auto-rit-${rideNumber}-${toDateInput(date)}-${toTime(date).replace(':', '')}.json`;
+}
+
+function createAutoBackup(nextData, rideNumber, shouldDownload = true) {
+  const createdAt = new Date();
+  const backup = {
+    id: crypto.randomUUID(),
+    name: makeBackupName(rideNumber, createdAt),
+    rideNumber,
+    createdAt: createdAt.toISOString(),
+    data: nextData,
+  };
+  saveAutoBackups([backup, ...getAutoBackups()]);
+  if (shouldDownload) {
+    downloadFile(backup.name, JSON.stringify(nextData, null, 2), 'application/json');
+  }
+  return backup;
 }
 
 function loadData() {
@@ -622,7 +657,11 @@ function App() {
       finishedAt: now.toISOString(),
       kilometers: endMileage - Number(data.activeRide.startMileage),
     };
-    updateData((current) => ({ ...current, activeRide: null, rides: [...current.rides, completed] }));
+    updateData((current) => {
+      const next = { ...current, activeRide: null, rides: [...current.rides, completed] };
+      createAutoBackup(next, completed.number);
+      return next;
+    });
     setFinishDraft({ arrivalPlace: '', endMileage: '' });
     setMessage('Rit opgeslagen.');
   }
@@ -665,7 +704,11 @@ function App() {
       return;
     }
     ride.kilometers = ride.endMileage - ride.startMileage;
-    updateData((current) => ({ ...current, rides: [...current.rides, ride] }));
+    updateData((current) => {
+      const next = { ...current, rides: [...current.rides, ride] };
+      createAutoBackup(next, ride.number);
+      return next;
+    });
     setShowManualForm(false);
     setManualRide(null);
     setMessage('Handmatige rit opgeslagen.');
@@ -791,6 +834,28 @@ function App() {
     downloadFile(`rittenadministratie-backup-${toDateInput()}.json`, JSON.stringify(data, null, 2), 'application/json');
   }
 
+  function downloadLatestAutoBackup() {
+    const [latest] = getAutoBackups();
+    if (!latest) {
+      setMessage('Er is nog geen automatische back-up.');
+      return;
+    }
+    downloadFile(latest.name, JSON.stringify(latest.data, null, 2), 'application/json');
+    setMessage(`Automatische back-up gedownload: ${latest.name}`);
+  }
+
+  function restoreLatestAutoBackup() {
+    const [latest] = getAutoBackups();
+    if (!latest) {
+      setMessage('Er is nog geen automatische back-up om terug te zetten.');
+      return;
+    }
+    const ok = window.confirm(`Laatste automatische back-up terugzetten?\n\n${latest.name}\n\nJe huidige gegevens worden vervangen.`);
+    if (!ok) return;
+    updateData(normalizeStoredData(latest.data));
+    setMessage(`Automatische back-up teruggezet: ${latest.name}`);
+  }
+
   function restoreBackup(file) {
     if (!file) return;
     const reader = new FileReader();
@@ -828,6 +893,8 @@ function App() {
         <div className="top-actions">
           {installPrompt && <button onClick={installApp}>App installeren</button>}
           <button onClick={saveBackup}>Back-up opslaan</button>
+          <button onClick={downloadLatestAutoBackup}>Laatste auto-back-up downloaden</button>
+          <button onClick={restoreLatestAutoBackup}>Laatste auto-back-up terugzetten</button>
           <button onClick={() => backupInputRef.current.click()}>Back-up terugzetten</button>
           <input ref={backupInputRef} type="file" accept="application/json" hidden onChange={(event) => restoreBackup(event.target.files[0])} />
         </div>
