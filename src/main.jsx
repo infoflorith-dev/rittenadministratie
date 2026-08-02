@@ -466,6 +466,7 @@ function App() {
     const privateKm = rides.filter((ride) => ride.type !== 'Zakelijk').reduce((total, ride) => total + Number(ride.kilometers || 0), 0);
     const total = business + privateKm;
     return {
+      rideCount: rides.length,
       business,
       privateKm,
       total,
@@ -977,7 +978,18 @@ function App() {
         </section>
       )}
 
-      <Dashboard stats={stats} period={period} setPeriod={setPeriod} periodStats={periodStats} />
+      <Dashboard
+        stats={{
+          ...stats,
+          totalRides: periodStats.rideCount,
+          totalKm: periodStats.total,
+          businessKm: periodStats.business,
+          privateKm: periodStats.privateKm,
+        }}
+        period={period}
+        setPeriod={setPeriod}
+        periodStats={periodStats}
+      />
 
       <section className="layout app-section" data-mobile-section="home">
         <VehicleSettings vehicle={data.vehicle} updateVehicle={updateVehicle} />
