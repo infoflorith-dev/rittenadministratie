@@ -441,7 +441,7 @@ function App() {
       businessKm: sum(data.rides.filter((ride) => ride.type === 'Zakelijk')),
       privateKm: sum(data.rides.filter((ride) => ride.type === 'Prive')),
       currentMileage: data.activeRide ? data.activeRide.startMileage : lastMileage,
-      lastRide: latestRide ? `${formatDate(latestRide.date)} ${latestRide.arrivalTime}` : '-',
+      lastRide: latestRide ? formatDate(latestRide.date) : '-',
       todayKm: sum(data.rides.filter((ride) => ride.date === today)),
       weekKm: sum(data.rides.filter((ride) => ride.date >= weekInput)),
       monthKm: sum(data.rides.filter((ride) => ride.date >= monthInput)),
@@ -814,15 +814,13 @@ function App() {
     doc.text(`Totaal: ${formatKm(totals.total)} | Zakelijk: ${formatKm(totals.business)} | Prive: ${formatKm(totals.private)}`, 90, 32);
     autoTable(doc, {
       startY: 39,
-      head: [['Rit', 'Datum', 'Bestuurder', 'Van', 'Naar', 'Vertrek', 'Aankomst', 'Beginstand', 'Eindstand', 'Km', 'Type', 'Doel']],
+      head: [['Rit', 'Datum', 'Bestuurder', 'Van', 'Naar', 'Beginstand', 'Eindstand', 'Km', 'Type', 'Doel']],
       body: rides.map((ride) => [
         ride.number,
         formatDate(ride.date),
         ride.driverName,
         ride.departurePlace,
         ride.arrivalPlace,
-        ride.departureTime,
-        ride.arrivalTime,
         formatKm(ride.startMileage),
         formatKm(ride.endMileage),
         ride.kilometers,
@@ -858,8 +856,6 @@ function App() {
           Bestuurder: ride.driverName,
           Van: ride.departurePlace,
           Naar: ride.arrivalPlace,
-          Vertrek: ride.departureTime,
-          Aankomst: ride.arrivalTime,
           Beginstand: ride.startMileage,
           Eindstand: ride.endMileage,
           Kilometers: ride.kilometers,
@@ -1234,10 +1230,6 @@ function RideControl(props) {
               <input type="date" value={draft.date} onChange={(event) => setDraft({ ...draft, date: event.target.value })} />
             </label>
             <label>
-              Vertrektijd
-              <input type="time" value={draft.departureTime} onChange={(event) => setDraft({ ...draft, departureTime: event.target.value })} />
-            </label>
-            <label>
               Bestuurder
               <input value={draft.driverName} onChange={(event) => setDraft({ ...draft, driverName: event.target.value })} />
             </label>
@@ -1290,7 +1282,6 @@ function RideControl(props) {
             <div><dt>Ritnummer</dt><dd>{activeRide.number}</dd></div>
             <div><dt>Datum</dt><dd>{formatDate(activeRide.date)}</dd></div>
             <div><dt>Vertrekplaats</dt><dd>{activeRide.departurePlace}</dd></div>
-            <div><dt>Vertrektijd</dt><dd>{activeRide.departureTime}</dd></div>
             <div><dt>Beginstand</dt><dd>{formatKm(activeRide.startMileage)}</dd></div>
             <div><dt>Bestuurder</dt><dd>{activeRide.driverName}</dd></div>
             {activeRide.plannedArrivalPlace && <div><dt>Gepland naar</dt><dd>{activeRide.plannedArrivalPlace}</dd></div>}
@@ -1550,8 +1541,6 @@ function RideTable({ rides, onEdit, onDelete }) {
             <th>Bestuurder</th>
             <th>Van</th>
             <th>Naar</th>
-            <th>Vertrek</th>
-            <th>Aankomst</th>
             <th>Beginstand</th>
             <th>Eindstand</th>
             <th>Kilometers</th>
@@ -1563,7 +1552,7 @@ function RideTable({ rides, onEdit, onDelete }) {
         <tbody>
           {rides.length === 0 && (
             <tr>
-              <td colSpan="13" className="empty">Nog geen ritten gevonden.</td>
+              <td colSpan="11" className="empty">Nog geen ritten gevonden.</td>
             </tr>
           )}
           {rides.map((ride) => (
@@ -1573,8 +1562,6 @@ function RideTable({ rides, onEdit, onDelete }) {
               <td data-label="Bestuurder">{ride.driverName}</td>
               <td data-label="Van">{ride.departurePlace}</td>
               <td data-label="Naar">{ride.arrivalPlace}</td>
-              <td data-label="Vertrek">{ride.departureTime}</td>
-              <td data-label="Aankomst">{ride.arrivalTime}</td>
               <td data-label="Beginstand" className="number">{formatKm(ride.startMileage)}</td>
               <td data-label="Eindstand" className="number">{formatKm(ride.endMileage)}</td>
               <td data-label="Kilometers" className="number">{formatKm(ride.kilometers)}</td>
@@ -1609,8 +1596,6 @@ function RideTable({ rides, onEdit, onDelete }) {
                 <div><span>Bestuurder</span><strong>{ride.driverName}</strong></div>
                 <div><span>Van</span><strong>{ride.departurePlace}</strong></div>
                 <div><span>Naar</span><strong>{ride.arrivalPlace}</strong></div>
-                <div><span>Vertrek</span><strong>{ride.departureTime || '-'}</strong></div>
-                <div><span>Aankomst</span><strong>{ride.arrivalTime || '-'}</strong></div>
                 <div><span>Beginstand</span><strong>{formatKm(ride.startMileage)}</strong></div>
                 <div><span>Eindstand</span><strong>{formatKm(ride.endMileage)}</strong></div>
                 <div><span>Kilometers</span><strong>{formatKm(ride.kilometers)}</strong></div>
@@ -1644,8 +1629,6 @@ function EditRideModal({ ride, setRide, onSave, onClose }) {
           <label>Bestuurder<input value={ride.driverName} onChange={(event) => setRide({ ...ride, driverName: event.target.value })} /></label>
           <label>Van<input value={ride.departurePlace} onChange={(event) => setRide({ ...ride, departurePlace: event.target.value })} /></label>
           <label>Naar<input value={ride.arrivalPlace} onChange={(event) => setRide({ ...ride, arrivalPlace: event.target.value })} /></label>
-          <label>Vertrek<input type="time" value={ride.departureTime} onChange={(event) => setRide({ ...ride, departureTime: event.target.value })} /></label>
-          <label>Aankomst<input type="time" value={ride.arrivalTime} onChange={(event) => setRide({ ...ride, arrivalTime: event.target.value })} /></label>
           <label>Beginstand<input inputMode="numeric" value={ride.startMileage} onChange={(event) => setRide({ ...ride, startMileage: event.target.value })} /></label>
           <label>Eindstand<input inputMode="numeric" value={ride.endMileage} onChange={(event) => setRide({ ...ride, endMileage: event.target.value })} /></label>
           <label>Type<select value={ride.type} onChange={(event) => setRide({ ...ride, type: event.target.value })}><option>Zakelijk</option><option value="Prive">Privé</option></select></label>
