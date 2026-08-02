@@ -882,6 +882,35 @@ function App() {
     setMessage(`Automatische back-up gedownload: ${latest.name}`);
   }
 
+  async function mailLatestAutoBackup() {
+    const [latest] = getAutoBackups();
+    if (!latest) {
+      setMessage('Er is nog geen automatische back-up om te mailen.');
+      return;
+    }
+    const content = JSON.stringify(latest.data, null, 2);
+    const file = new File([content], latest.name, { type: 'application/json' });
+    if (navigator.canShare?.({ files: [file] })) {
+      try {
+        await navigator.share({
+          files: [file],
+          title: 'Laatste rittenadministratie back-up',
+          text: `Laatste back-up: ${latest.name}`,
+        });
+        setMessage(`Automatische back-up gedeeld: ${latest.name}`);
+        return;
+      } catch (error) {
+        if (error?.name === 'AbortError') {
+          setMessage('Back-up mailen geannuleerd.');
+          return;
+        }
+      }
+    }
+    downloadFile(latest.name, content, 'application/json');
+    window.location.href = `mailto:?subject=${encodeURIComponent('Laatste rittenadministratie back-up')}&body=${encodeURIComponent(`De back-up is gedownload als ${latest.name}. Voeg dit JSON-bestand toe als bijlage.`)}`;
+    setMessage(`Automatische back-up gedownload om te mailen: ${latest.name}`);
+  }
+
   function restoreLatestAutoBackup() {
     const [latest] = getAutoBackups();
     if (!latest) {
@@ -1016,6 +1045,7 @@ function App() {
         exportPdf={exportPdf}
         exportExcel={exportExcel}
         downloadLatestAutoBackup={downloadLatestAutoBackup}
+        mailLatestAutoBackup={mailLatestAutoBackup}
         restoreLatestAutoBackup={restoreLatestAutoBackup}
       />
 
@@ -1106,7 +1136,7 @@ function LatestRides({ rides, onEdit, onViewAll }) {
   );
 }
 
-function ExportPanel({ saveBackup, restoreBackup, exportPdf, exportExcel, downloadLatestAutoBackup, restoreLatestAutoBackup }) {
+function ExportPanel({ saveBackup, restoreBackup, exportPdf, exportExcel, downloadLatestAutoBackup, mailLatestAutoBackup, restoreLatestAutoBackup }) {
   return (
     <section className="panel export-panel app-section" data-mobile-section="export">
       <div className="section-heading">
@@ -1121,6 +1151,7 @@ function ExportPanel({ saveBackup, restoreBackup, exportPdf, exportExcel, downlo
         <button onClick={saveBackup}>Back-up opslaan</button>
         <button onClick={restoreBackup}>Back-up terugzetten</button>
         <button onClick={downloadLatestAutoBackup}>Laatste auto-back-up downloaden</button>
+        <button onClick={mailLatestAutoBackup}>Laatste auto-back-up mailen</button>
         <button onClick={restoreLatestAutoBackup}>Laatste auto-back-up terugzetten</button>
       </div>
     </section>
